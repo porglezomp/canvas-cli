@@ -5,7 +5,9 @@ extern crate toml;
 extern crate reqwest;
 extern crate hyper;
 extern crate chrono;
+extern crate clap;
 
+use clap::{App, Arg, SubCommand};
 use chrono::{DateTime, Utc};
 use hyper::header::{Authorization, Bearer};
 use std::io::Read;
@@ -76,38 +78,96 @@ fn main() {
 
 
 fn run() -> Result<(), String> {
+    let matches = App::new(env!("CARGO_PKG_NAME"))
+        .version(env!("CARGO_PKG_VERSION"))
+        .author("C Jones <code@calebjones.net>")
+        .about("An app for interacting with Canvas")
+        .setting(clap::AppSettings::ArgRequiredElseHelp)
+        .subcommand(
+            SubCommand::with_name("ls")
+                .about("List files or courses")
+                .arg(
+                    Arg::with_name("course")
+                        .help("The course to list files in. If this is omitted, then ls will return a list of courses")
+                        .takes_value(true)
+                        .required(false),
+                )
+                .arg(
+                    Arg::with_name("path")
+                        .help("The path to examine. Defaults to /")
+                        .takes_value(true)
+                        .required(false),
+                ),
+        )
+        .subcommand(
+            SubCommand::with_name("download")
+                .about("Download files")
+                .arg(
+                    Arg::with_name("course")
+                        .help("The course to download files from")
+                        .takes_value(true)
+                        .required(true),
+                )
+                .arg(
+                    Arg::with_name("path")
+                        .help("The path to download")
+                        .takes_value(true)
+                        .required(true),
+                ),
+        )
+        .get_matches();
+
     let config = get_config()?;
     let client = reqwest::Client::new().map_err(|err| {
         format!("Failed to make HTTP client ({})", err)
     })?;
     let courses = get_course_list(&config, &client)?;
-    for course in &courses {
-        println!("{}", course.name);
-        println!("  Id:\t{}", course.id);
-        println!("  Code:\t{}", course.course_code);
-        if let Some(ref desc) = course.public_description {
-            println!("  Desc:\t{}", desc);
-        }
-
-        let root_folder = get_course_root_folder(&config, &client, course.id);
-        if let Ok(root_folder) = root_folder {
-            match get_files_and_folders(&config, &client, &root_folder) {
-                Ok((files, folders)) => {
-                    println!("  Folders:");
-                    for folder in folders {
-                        println!("    {}", folder.name);
-                        println!("      Id:   {}", folder.id);
-                        println!("      Path: {}", folder.full_name);
-                    }
-                    println!("  Files:");
-                    for file in files {
-                        println!("    {}", file.display_name);
+    match matches.subcommand() {
+        ("ls", Some(ls)) => {
+            if let Some(course_name) = ls.value_of("course") {
+                let mut view_course = None;
+                for course in courses {
+                    if course.name.starts_with(course_name) {
+                        if view_course.is_none() {
+                            view_course = Some(course);
+                        } else {
+                            return Err(format!("Multiple courses start with \"{}\"", course_name));
+                        }
                     }
                 }
-                Err(err) => eprintln!("  Error loading folders: {}", err),
+                match view_course {
+                    Some(course) => {
+                        let dir = match ls.value_of("path") {
+                            Some("/") | None => {
+                                get_course_root_folder(&config, &client, course.id)?
+                            }
+                            Some(path) => get_course_folder(&config, &client, course.id, &path)?,
+                        };
+                        let (files, folders) = get_files_and_folders(&config, &client, &dir)?;
+                        for folder in folders {
+                            println!("{}/", folder.name);
+                        }
+                        for file in files {
+                            println!("{}", file.display_name);
+                        }
+                    }
+                    None => return Err(format!("No course starts with \"{}\"", course_name)),
+                }
+            } else {
+                for course in courses {
+                    println!("{}", course.name);
+                }
             }
         }
+        ("download", Some(dl)) => {
+            // @Todo: Download folders https://canvas.instructure.com/doc/api/content_exports.html
+            if let (Some(_course), Some(_path)) = (dl.value_of("course"), dl.value_of("path")) {
+                unimplemented!();
+            }
+        }
+        _ => unreachable!(),
     }
+
     Ok(())
 }
 
@@ -138,6 +198,24 @@ fn get_url_json<T: serde::de::DeserializeOwned>(
 fn get_course_list(config: &Config, client: &reqwest::Client) -> Result<Vec<Course>, String> {
     let url = format!("https://{}/api/v1/courses?per_page=32", config.api.url);
     get_url_json(config, client, &url)
+}
+
+fn get_course_folder(
+    config: &Config,
+    client: &reqwest::Client,
+    course_id: u64,
+    path: &str,
+) -> Result<Folder, String> {
+    let url = format!(
+        "https://{}/api/v1/courses/{}/folders/by_path/{}",
+        config.api.url,
+        course_id,
+        path.trim_left_matches('/')
+    );
+    let mut folders: Vec<_> = get_url_json(config, client, &url)?;
+    folders.pop().ok_or_else(
+        || format!("No files at path {}", path),
+    )
 }
 
 fn get_course_root_folder(
