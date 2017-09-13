@@ -111,29 +111,6 @@ fn run() -> Result<(), String> {
     Ok(())
 }
 
-fn get_course_list(config: &Config, client: &reqwest::Client) -> Result<Vec<Course>, String> {
-    let mut response = client
-        .get(&format!(
-            "https://{}/api/v1/courses?per_page=32",
-            config.api.url
-        ))
-        .map_err(|err| format!("Failed to make GET request ({})", err))?
-        .header(Authorization(Bearer { token: config.api.key.clone() }))
-        .send()
-        .map_err(|err| format!("Failed to request ({})", err))?;
-    if response.status().is_success() {
-        response.json().map_err(|err| {
-            format!("Failed to load course list ({})", err)
-        })
-    } else {
-        Err(format!(
-            "Failed to fetch {}: HTTP status {}",
-            response.url(),
-            response.status()
-        ))
-    }
-}
-
 fn get_url_json<T: serde::de::DeserializeOwned>(
     config: &Config,
     client: &reqwest::Client,
@@ -158,6 +135,11 @@ fn get_url_json<T: serde::de::DeserializeOwned>(
     }
 }
 
+fn get_course_list(config: &Config, client: &reqwest::Client) -> Result<Vec<Course>, String> {
+    let url = format!("https://{}/api/v1/courses?per_page=32", config.api.url);
+    get_url_json(config, client, &url)
+}
+
 fn get_course_root_folder(
     config: &Config,
     client: &reqwest::Client,
@@ -168,23 +150,7 @@ fn get_course_root_folder(
         config.api.url,
         course_id
     );
-    let mut response = client
-        .get(&url)
-        .map_err(|err| format!("Failed to make GET request ({})", err))?
-        .header(Authorization(Bearer { token: config.api.key.clone() }))
-        .send()
-        .map_err(|err| format!("Failed to request ({})", err))?;
-    if response.status().is_success() {
-        response.json().map_err(|err| {
-            format!("Failed to load folder list ({})", err)
-        })
-    } else {
-        Err(format!(
-            "Failed to fetch {}: HTTP status {}",
-            response.url(),
-            response.status()
-        ))
-    }
+    get_url_json(config, client, &url)
 }
 
 fn get_files_and_folders(
