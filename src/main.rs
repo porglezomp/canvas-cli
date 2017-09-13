@@ -1,5 +1,6 @@
 #[macro_use]
 extern crate serde_derive;
+extern crate serde;
 extern crate toml;
 extern crate reqwest;
 extern crate hyper;
@@ -8,6 +9,8 @@ extern crate chrono;
 use chrono::{DateTime, Utc};
 use hyper::header::{Authorization, Bearer};
 use std::io::Read;
+
+// @Todo: Use the Link header to get the rel=next links to handle pagination
 
 
 #[derive(Deserialize, Debug)]
@@ -31,6 +34,22 @@ enum WorkflowState {
     Available,
     Completed,
     Deleted,
+}
+
+#[derive(Deserialize, Debug)]
+struct Folder {
+    id: u64,
+    folders_url: String,
+    files_url: String,
+    name: String,
+    full_name: String,
+}
+
+#[derive(Deserialize, Debug)]
+struct File {
+    id: u64,
+    display_name: String,
+    url: String,
 }
 
 #[derive(Deserialize, Debug)]
@@ -62,12 +81,31 @@ fn run() -> Result<(), String> {
         format!("Failed to make HTTP client ({})", err)
     })?;
     let courses = get_course_list(&config, &client)?;
-    for course in courses {
+    for course in &courses {
         println!("{}", course.name);
         println!("  Id:\t{}", course.id);
         println!("  Code:\t{}", course.course_code);
-        if let Some(desc) = course.public_description {
+        if let Some(ref desc) = course.public_description {
             println!("  Desc:\t{}", desc);
+        }
+
+        let root_folder = get_course_root_folder(&config, &client, course.id);
+        if let Ok(root_folder) = root_folder {
+            match get_files_and_folders(&config, &client, &root_folder) {
+                Ok((files, folders)) => {
+                    println!("  Folders:");
+                    for folder in folders {
+                        println!("    {}", folder.name);
+                        println!("      Id:   {}", folder.id);
+                        println!("      Path: {}", folder.full_name);
+                    }
+                    println!("  Files:");
+                    for file in files {
+                        println!("    {}", file.display_name);
+                    }
+                }
+                Err(err) => eprintln!("  Error loading folders: {}", err),
+            }
         }
     }
     Ok(())
@@ -75,7 +113,10 @@ fn run() -> Result<(), String> {
 
 fn get_course_list(config: &Config, client: &reqwest::Client) -> Result<Vec<Course>, String> {
     let mut response = client
-        .get(&format!("https://{}/api/v1/courses", config.api.url))
+        .get(&format!(
+            "https://{}/api/v1/courses?per_page=32",
+            config.api.url
+        ))
         .map_err(|err| format!("Failed to make GET request ({})", err))?
         .header(Authorization(Bearer { token: config.api.key.clone() }))
         .send()
@@ -91,6 +132,69 @@ fn get_course_list(config: &Config, client: &reqwest::Client) -> Result<Vec<Cour
             response.status()
         ))
     }
+}
+
+fn get_url_json<T: serde::de::DeserializeOwned>(
+    config: &Config,
+    client: &reqwest::Client,
+    url: &str,
+) -> Result<T, String> {
+    let mut response = client
+        .get(url)
+        .map_err(|err| format!("Failed to make GET request ({})", err))?
+        .header(Authorization(Bearer { token: config.api.key.clone() }))
+        .send()
+        .map_err(|err| format!("Failed to request ({})", err))?;
+    if response.status().is_success() {
+        response.json().map_err(|err| {
+            format!("Failed to load folder list ({})", err)
+        })
+    } else {
+        Err(format!(
+            "Failed to fetch {}: HTTP status {}",
+            response.url(),
+            response.status()
+        ))
+    }
+}
+
+fn get_course_root_folder(
+    config: &Config,
+    client: &reqwest::Client,
+    course_id: u64,
+) -> Result<Folder, String> {
+    let url = format!(
+        "https://{}/api/v1/courses/{}/folders/root/",
+        config.api.url,
+        course_id
+    );
+    let mut response = client
+        .get(&url)
+        .map_err(|err| format!("Failed to make GET request ({})", err))?
+        .header(Authorization(Bearer { token: config.api.key.clone() }))
+        .send()
+        .map_err(|err| format!("Failed to request ({})", err))?;
+    if response.status().is_success() {
+        response.json().map_err(|err| {
+            format!("Failed to load folder list ({})", err)
+        })
+    } else {
+        Err(format!(
+            "Failed to fetch {}: HTTP status {}",
+            response.url(),
+            response.status()
+        ))
+    }
+}
+
+fn get_files_and_folders(
+    config: &Config,
+    client: &reqwest::Client,
+    folder: &Folder,
+) -> Result<(Vec<File>, Vec<Folder>), String> {
+    let files = get_url_json(config, client, &folder.files_url)?;
+    let folders = get_url_json(config, client, &folder.folders_url)?;
+    Ok((files, folders))
 }
 
 fn get_config() -> Result<Config, String> {
