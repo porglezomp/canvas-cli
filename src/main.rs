@@ -15,6 +15,7 @@ use std::io::Read;
 // @Todo: Use the Link header to get the rel=next links to handle pagination
 
 
+/// https://canvas.instructure.com/doc/api/courses.html
 #[derive(Deserialize, Debug)]
 struct Course {
     id: u64,
@@ -38,6 +39,7 @@ enum WorkflowState {
     Deleted,
 }
 
+/// https://canvas.instructure.com/doc/api/files.html
 #[derive(Deserialize, Debug)]
 struct Folder {
     id: u64,
@@ -47,11 +49,21 @@ struct Folder {
     full_name: String,
 }
 
+/// https://canvas.instructure.com/doc/api/files.html
 #[derive(Deserialize, Debug)]
 struct File {
     id: u64,
     display_name: String,
     url: String,
+}
+
+/// https://canvas.instructure.com/doc/api/assignments.html
+#[derive(Deserialize, Debug)]
+struct Assignment {
+    id: u64,
+    name: String,
+    description: Option<String>,
+    due_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -217,10 +229,6 @@ fn run() -> Result<(), String> {
     Ok(())
 }
 
-fn get_client() -> Result<reqwest::Client, String> {
-    reqwest::Client::new().map_err(|err| format!("Failed to make HTTP client ({})", err))
-}
-
 fn course_subcommand(matches: &clap::ArgMatches) -> Result<(), String> {
     let config = get_config()?;
     let client = get_client()?;
@@ -237,28 +245,6 @@ fn course_subcommand(matches: &clap::ArgMatches) -> Result<(), String> {
     Ok(())
 }
 
-fn find_course_id(
-    config: &Config,
-    client: &reqwest::Client,
-    course_id: &str,
-) -> Result<u64, String> {
-    let mut view_course = None;
-    let courses = get_course_list(config, client)?;
-    for course in courses {
-        if course.name.starts_with(course_id) {
-            if view_course.is_none() {
-                view_course = Some(course);
-            } else {
-                return Err(format!("Multiple courses start with \"{}\"", course_id));
-            }
-        }
-    }
-    match view_course {
-        Some(course) => Ok(course.id),
-        None => Err(format!("No course starts with \"{}\"", course_id)),
-    }
-}
-
 fn file_subcommand(matches: &clap::ArgMatches) -> Result<(), String> {
     let config = get_config()?;
     let client = get_client()?;
@@ -266,10 +252,12 @@ fn file_subcommand(matches: &clap::ArgMatches) -> Result<(), String> {
         ("ls", Some(ls_matches)) => {
             let course_id =
                 find_course_id(&config, &client, &ls_matches.value_of("course").unwrap())?;
+
             let dir = match ls_matches.value_of("path") {
                 Some("/") | None => get_course_root_folder(&config, &client, course_id)?,
                 Some(path) => get_course_folder(&config, &client, course_id, &path)?,
             };
+
             let (files, folders) = get_files_and_folders(&config, &client, &dir)?;
             for folder in folders {
                 println!("{}/", folder.name);
@@ -286,14 +274,35 @@ fn file_subcommand(matches: &clap::ArgMatches) -> Result<(), String> {
 }
 
 fn assignment_subcommand(matches: &clap::ArgMatches) -> Result<(), String> {
-    let _config = get_config()?;
-    let _client = get_client()?;
+    let config = get_config()?;
+    let client = get_client()?;
     match matches.subcommand() {
-        ("ls", Some(_ls_matches)) => unimplemented!(),
+        ("ls", Some(ls_matches)) => {
+            let course_id =
+                find_course_id(&config, &client, &ls_matches.value_of("course").unwrap())?;
+
+            let assignments = get_assignments(&config, &client, course_id)?;
+            for assignment in assignments {
+                if let Some(due) = assignment.due_at {
+                    println!("{} (due {:?})", assignment.name, due);
+                } else {
+                    println!("{}", assignment.name);
+                }
+                if let Some(description) = assignment.description {
+                    // @Todo: Handle HTML
+                    if description.len() > 72 {
+                        println!("  {}...", description.chars().take(72).collect::<String>());
+                    } else {
+                        println!("  {}", description);
+                    }
+                }
+            }
+        }
         ("info", Some(_info_matches)) => unimplemented!(),
         ("submit", Some(_submit_matches)) => unimplemented!(),
         _ => unreachable!(),
     }
+    Ok(())
 }
 
 fn config_subcommand(_matches: &clap::ArgMatches) -> Result<(), String> {
@@ -302,6 +311,36 @@ fn config_subcommand(_matches: &clap::ArgMatches) -> Result<(), String> {
 
 
 // @Todo: Download folders https://canvas.instructure.com/doc/api/content_exports.html
+
+fn find_course_id(
+    config: &Config,
+    client: &reqwest::Client,
+    course_id: &str,
+) -> Result<u64, String> {
+    // If we have an integer ID, then we return that instead of making a network request
+    if let Ok(id) = course_id.parse() {
+        return Ok(id);
+    }
+
+    let mut view_course = None;
+    let courses = get_course_list(config, client)?;
+    for course in courses {
+        if course.name.starts_with(course_id) {
+            if view_course.is_none() {
+                view_course = Some(course);
+            } else {
+                return Err(format!("Multiple courses start with \"{}\"", course_id));
+            }
+        }
+    }
+
+    // @Improvement: match on some of the other identifiers?
+
+    match view_course {
+        Some(course) => Ok(course.id),
+        None => Err(format!("No course starts with \"{}\"", course_id)),
+    }
+}
 
 fn get_url_json<T: serde::de::DeserializeOwned>(
     config: &Config,
@@ -315,9 +354,9 @@ fn get_url_json<T: serde::de::DeserializeOwned>(
         .send()
         .map_err(|err| format!("Failed to request ({})", err))?;
     if response.status().is_success() {
-        response.json().map_err(|err| {
-            format!("Failed to load folder list ({})", err)
-        })
+        response.json().map_err(
+            |err| format!("Failed to load ({})", err),
+        )
     } else {
         Err(format!(
             "Failed to fetch {}: HTTP status {}",
@@ -373,6 +412,20 @@ fn get_files_and_folders(
     Ok((files, folders))
 }
 
+fn get_assignments(
+    config: &Config,
+    client: &reqwest::Client,
+    course_id: u64,
+) -> Result<Vec<Assignment>, String> {
+    let url = format!(
+        "https://{}/api/v1/courses/{}/assignments/",
+        config.api.url,
+        course_id
+    );
+    let assignments = get_url_json(config, client, &url)?;
+    Ok(assignments)
+}
+
 fn get_config() -> Result<Config, String> {
     let path = std::env::home_dir()
         .ok_or_else(|| String::from("Missing home directory"))?
@@ -385,4 +438,8 @@ fn get_config() -> Result<Config, String> {
         format!("Cannot read config file ({})", err)
     })?;
     toml::from_slice(&data).map_err(|err| format!("Cannot parse config ({})", err))
+}
+
+fn get_client() -> Result<reqwest::Client, String> {
+    reqwest::Client::new().map_err(|err| format!("Failed to make HTTP client ({})", err))
 }
