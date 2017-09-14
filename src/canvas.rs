@@ -111,7 +111,7 @@ pub fn get_url_json<T: DeserializeOwned>(config: &Config, client: &Client, url: 
 }
 
 pub fn get_course_list(config: &Config, client: &Client) -> Result<Vec<Course>> {
-    let url = format!("{}/v1/courses?per_page=32", config.api_url());
+    let url = format!("{}/courses?per_page=32", config.api_url());
     get_url_json(config, client, &url)
 }
 

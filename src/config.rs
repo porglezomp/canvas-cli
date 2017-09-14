@@ -26,14 +26,21 @@ impl Config {
     }
 }
 
-pub fn get_config() -> Result<Config, String> {
+pub fn config_path() -> Result<std::path::PathBuf, String> {
     let path = std::env::home_dir()
         .ok_or_else(|| String::from("Missing home directory"))?
         .join(".config/canvas-cli/config.toml");
+    Ok(path)
+}
+
+pub fn config_file() -> Result<std::fs::File, String> {
+    let path = config_path()?;
+    std::fs::File::open(path).map_err(|err| format!("Cannot open config file ({})", err))
+}
+
+pub fn get_config() -> Result<Config, String> {
+    let mut file = config_file()?;
     let mut data = Vec::new();
-    let mut file = std::fs::File::open(path).map_err(|err| {
-        format!("Cannot open config file ({})", err)
-    })?;
     file.read_to_end(&mut data).map_err(|err| {
         format!("Cannot read config file ({})", err)
     })?;
