@@ -1,5 +1,5 @@
 [package]
-name = "canvas-cli"
+name = "canvas"
 version = "0.1.0"
 authors = ["Caleb Jones <code@calebjones.net>"]
 

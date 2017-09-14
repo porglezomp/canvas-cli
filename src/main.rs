@@ -78,98 +78,172 @@ fn main() {
 
 
 fn run() -> Result<(), String> {
-    let matches = App::new(env!("CARGO_PKG_NAME"))
+    let matches = App::new("canvas")
         .version(env!("CARGO_PKG_VERSION"))
         .author("C Jones <code@calebjones.net>")
         .about("An app for interacting with Canvas")
         .setting(clap::AppSettings::ArgRequiredElseHelp)
         .subcommand(
-            SubCommand::with_name("ls")
-                .about("List files or courses")
-                .arg(
-                    Arg::with_name("course")
-                        .help("The course to list files in. If this is omitted, then ls will return a list of courses")
-                        .takes_value(true)
-                        .required(false),
-                )
-                .arg(
-                    Arg::with_name("path")
-                        .help("The path to examine. Defaults to /")
-                        .takes_value(true)
-                        .required(false),
+            SubCommand::with_name("course")
+                .about("List courses and view course information")
+                .subcommand(SubCommand::with_name("ls").about("List courses"))
+                .subcommand(
+                    SubCommand::with_name("info")
+                        .about("Display information about a course")
+                        .arg(
+                            Arg::with_name("course")
+                                .help("A course title or numeric ID")
+                                .takes_value(true)
+                                .required(true),
+                        ),
                 ),
         )
         .subcommand(
-            SubCommand::with_name("download")
-                .about("Download files")
-                .arg(
-                    Arg::with_name("course")
-                        .help("The course to download files from")
-                        .takes_value(true)
-                        .required(true),
+            SubCommand::with_name("file")
+                .about("List, inspect, or download files")
+                .subcommand(
+                    SubCommand::with_name("ls")
+                        .about("List files")
+                        .arg(
+                            Arg::with_name("course")
+                                .help("A course title or numeric ID")
+                                .takes_value(true)
+                                .required(true),
+                        )
+                        .arg(
+                            Arg::with_name("path")
+                                .help("The directory to examine. Defaults to /")
+                                .takes_value(true)
+                                .required(false),
+                        ),
                 )
-                .arg(
-                    Arg::with_name("path")
-                        .help("The path to download")
-                        .takes_value(true)
-                        .required(true),
+                .subcommand(
+                    SubCommand::with_name("info")
+                        .about("Display information about a file")
+                        .arg(
+                            Arg::with_name("course")
+                                .help("A course title or numeric ID")
+                                .takes_value(true)
+                                .required(true),
+                        )
+                        .arg(
+                            Arg::with_name("path")
+                                .help("The file or directory to examine")
+                                .takes_value(true)
+                                .required(true),
+                        ),
+                )
+                .subcommand(
+                    SubCommand::with_name("download")
+                        .about("Download a file")
+                        .arg(
+                            Arg::with_name("course")
+                                .help("A course title or numeric ID")
+                                .takes_value(true)
+                                .required(true),
+                        )
+                        .arg(
+                            Arg::with_name("path")
+                                .help("The file or directory to download")
+                                .takes_value(true)
+                                .required(true),
+                        ),
                 ),
         )
+        .subcommand(
+            SubCommand::with_name("assignment")
+                .about("List, inspect, or submit assignments")
+                .subcommand(
+                    SubCommand::with_name("ls").about("List assignments").arg(
+                        Arg::with_name("course")
+                            .help("A course title or numeric ID")
+                            .takes_value(true)
+                            .required(true),
+                    ),
+                )
+                .subcommand(
+                    SubCommand::with_name("info")
+                        .about("Display information about an assignment")
+                        .arg(
+                            Arg::with_name("course")
+                                .help("A course title or numeric ID")
+                                .takes_value(true)
+                                .required(true),
+                        )
+                        .arg(
+                            Arg::with_name("id")
+                                .help("An assignment ID")
+                                .takes_value(true)
+                                .required(true),
+                        ),
+                )
+                .subcommand(
+                    SubCommand::with_name("submit")
+                        .about("Submit files for an assignment")
+                        .arg(
+                            Arg::with_name("course")
+                                .help("A course title or numeric ID")
+                                .takes_value(true)
+                                .required(true),
+                        )
+                        .arg(
+                            Arg::with_name("id")
+                                .help("An assignment ID")
+                                .takes_value(true)
+                                .required(true),
+                        )
+                        .arg(
+                            Arg::with_name("file")
+                                .help("The file to submit")
+                                .takes_value(true)
+                                .multiple(true)
+                                .required(true),
+                        ),
+                ),
+        )
+        .subcommand(SubCommand::with_name("config").about(
+            "Edit the user config",
+        ))
         .get_matches();
 
-    let config = get_config()?;
-    let client = reqwest::Client::new().map_err(|err| {
-        format!("Failed to make HTTP client ({})", err)
-    })?;
-    let courses = get_course_list(&config, &client)?;
     match matches.subcommand() {
-        ("ls", Some(ls)) => {
-            if let Some(course_name) = ls.value_of("course") {
-                let mut view_course = None;
-                for course in courses {
-                    if course.name.starts_with(course_name) {
-                        if view_course.is_none() {
-                            view_course = Some(course);
-                        } else {
-                            return Err(format!("Multiple courses start with \"{}\"", course_name));
-                        }
-                    }
-                }
-                match view_course {
-                    Some(course) => {
-                        let dir = match ls.value_of("path") {
-                            Some("/") | None => {
-                                get_course_root_folder(&config, &client, course.id)?
-                            }
-                            Some(path) => get_course_folder(&config, &client, course.id, &path)?,
-                        };
-                        let (files, folders) = get_files_and_folders(&config, &client, &dir)?;
-                        for folder in folders {
-                            println!("{}/", folder.name);
-                        }
-                        for file in files {
-                            println!("{}", file.display_name);
-                        }
-                    }
-                    None => return Err(format!("No course starts with \"{}\"", course_name)),
-                }
-            } else {
-                for course in courses {
-                    println!("{}", course.name);
-                }
-            }
-        }
-        ("download", Some(dl)) => {
-            // @Todo: Download folders https://canvas.instructure.com/doc/api/content_exports.html
-            if let (Some(_course), Some(_path)) = (dl.value_of("course"), dl.value_of("path")) {
-                unimplemented!();
-            }
-        }
+        ("course", Some(course_matches)) => course_subcommand(course_matches)?,
+        ("file", Some(file_matches)) => file_subcommand(file_matches)?,
+        ("assignment", Some(assignment_matches)) => assignment_subcommand(assignment_matches)?,
+        ("config", Some(config_matches)) => config_subcommand(config_matches)?,
         _ => unreachable!(),
     }
 
     Ok(())
 }
+
+fn get_client() -> Result<reqwest::Client, String> {
+    reqwest::Client::new().map_err(|err| format!("Failed to make HTTP client ({})", err))
+}
+
+fn course_subcommand(matches: &clap::ArgMatches) -> Result<(), String> {
+    let config = get_config()?;
+    let client = get_client()?;
+    unimplemented!()
+}
+
+fn file_subcommand(matches: &clap::ArgMatches) -> Result<(), String> {
+    let config = get_config()?;
+    let client = get_client()?;
+    unimplemented!()
+}
+
+fn assignment_subcommand(matches: &clap::ArgMatches) -> Result<(), String> {
+    let config = get_config()?;
+    let client = get_client()?;
+    unimplemented!()
+}
+
+fn config_subcommand(_matches: &clap::ArgMatches) -> Result<(), String> {
+    unimplemented!()
+}
+
+// @Todo: Download folders https://canvas.instructure.com/doc/api/content_exports.html
 
 fn get_url_json<T: serde::de::DeserializeOwned>(
     config: &Config,
