@@ -224,24 +224,82 @@ fn get_client() -> Result<reqwest::Client, String> {
 fn course_subcommand(matches: &clap::ArgMatches) -> Result<(), String> {
     let config = get_config()?;
     let client = get_client()?;
-    unimplemented!()
+    match matches.subcommand() {
+        ("ls", Some(_ls_matches)) => {
+            let courses = get_course_list(&config, &client)?;
+            for course in courses {
+                println!("{:<10} {}", format!("({})", course.id), course.name);
+            }
+        }
+        ("info", Some(_info_matches)) => unimplemented!(),
+        _ => unreachable!(),
+    }
+    Ok(())
+}
+
+fn find_course_id(
+    config: &Config,
+    client: &reqwest::Client,
+    course_id: &str,
+) -> Result<u64, String> {
+    let mut view_course = None;
+    let courses = get_course_list(config, client)?;
+    for course in courses {
+        if course.name.starts_with(course_id) {
+            if view_course.is_none() {
+                view_course = Some(course);
+            } else {
+                return Err(format!("Multiple courses start with \"{}\"", course_id));
+            }
+        }
+    }
+    match view_course {
+        Some(course) => Ok(course.id),
+        None => Err(format!("No course starts with \"{}\"", course_id)),
+    }
 }
 
 fn file_subcommand(matches: &clap::ArgMatches) -> Result<(), String> {
     let config = get_config()?;
     let client = get_client()?;
-    unimplemented!()
+    match matches.subcommand() {
+        ("ls", Some(ls_matches)) => {
+            let course_id =
+                find_course_id(&config, &client, &ls_matches.value_of("course").unwrap())?;
+            let dir = match ls_matches.value_of("path") {
+                Some("/") | None => get_course_root_folder(&config, &client, course_id)?,
+                Some(path) => get_course_folder(&config, &client, course_id, &path)?,
+            };
+            let (files, folders) = get_files_and_folders(&config, &client, &dir)?;
+            for folder in folders {
+                println!("{}/", folder.name);
+            }
+            for file in files {
+                println!("{}", file.display_name);
+            }
+        }
+        ("info", Some(_info_matches)) => unimplemented!(),
+        ("download", Some(_download_matches)) => unimplemented!(),
+        _ => unreachable!(),
+    }
+    Ok(())
 }
 
 fn assignment_subcommand(matches: &clap::ArgMatches) -> Result<(), String> {
-    let config = get_config()?;
-    let client = get_client()?;
-    unimplemented!()
+    let _config = get_config()?;
+    let _client = get_client()?;
+    match matches.subcommand() {
+        ("ls", Some(_ls_matches)) => unimplemented!(),
+        ("info", Some(_info_matches)) => unimplemented!(),
+        ("submit", Some(_submit_matches)) => unimplemented!(),
+        _ => unreachable!(),
+    }
 }
 
 fn config_subcommand(_matches: &clap::ArgMatches) -> Result<(), String> {
     unimplemented!()
 }
+
 
 // @Todo: Download folders https://canvas.instructure.com/doc/api/content_exports.html
 
