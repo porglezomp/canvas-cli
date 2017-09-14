@@ -23,9 +23,20 @@ fn main() {
     });
 }
 
-
 fn run() -> Result<(), String> {
-    let matches = App::new("canvas")
+    let matches = app().get_matches();
+
+    match matches.subcommand() {
+        ("course", Some(course_matches)) => course_subcommand(course_matches),
+        ("file", Some(file_matches)) => file_subcommand(file_matches),
+        ("assignment", Some(assignment_matches)) => assignment_subcommand(assignment_matches),
+        ("config", Some(config_matches)) => config_subcommand(config_matches),
+        _ => unreachable!(),
+    }
+}
+
+fn app<'a, 'b>() -> App<'a, 'b> {
+    App::new("canvas")
         .version(env!("CARGO_PKG_VERSION"))
         .author("C Jones <code@calebjones.net>")
         .about("An app for interacting with Canvas")
@@ -151,17 +162,6 @@ fn run() -> Result<(), String> {
         .subcommand(SubCommand::with_name("config").about(
             "Edit the user config",
         ))
-        .get_matches();
-
-    match matches.subcommand() {
-        ("course", Some(course_matches)) => course_subcommand(course_matches)?,
-        ("file", Some(file_matches)) => file_subcommand(file_matches)?,
-        ("assignment", Some(assignment_matches)) => assignment_subcommand(assignment_matches)?,
-        ("config", Some(config_matches)) => config_subcommand(config_matches)?,
-        _ => unreachable!(),
-    }
-
-    Ok(())
 }
 
 fn course_subcommand(matches: &clap::ArgMatches) -> Result<(), String> {
