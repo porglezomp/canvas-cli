@@ -5,9 +5,8 @@ extern crate toml;
 extern crate reqwest;
 extern crate hyper;
 extern crate chrono;
+#[macro_use]
 extern crate clap;
-
-use clap::{App, Arg, SubCommand};
 
 mod config;
 mod canvas;
@@ -33,135 +32,6 @@ fn run() -> Result<(), String> {
         ("config", Some(config_matches)) => config_subcommand(config_matches),
         _ => unreachable!(),
     }
-}
-
-fn app<'a, 'b>() -> App<'a, 'b> {
-    App::new("canvas")
-        .version(env!("CARGO_PKG_VERSION"))
-        .author("C Jones <code@calebjones.net>")
-        .about("An app for interacting with Canvas")
-        .setting(clap::AppSettings::ArgRequiredElseHelp)
-        .subcommand(
-            SubCommand::with_name("course")
-                .about("List courses and view course information")
-                .subcommand(SubCommand::with_name("ls").about("List courses"))
-                .subcommand(
-                    SubCommand::with_name("info")
-                        .about("Display information about a course")
-                        .arg(
-                            Arg::with_name("course")
-                                .help("A course title or numeric ID")
-                                .takes_value(true)
-                                .required(true),
-                        ),
-                ),
-        )
-        .subcommand(
-            SubCommand::with_name("file")
-                .about("List, inspect, or download files")
-                .subcommand(
-                    SubCommand::with_name("ls")
-                        .about("List files")
-                        .arg(
-                            Arg::with_name("course")
-                                .help("A course title or numeric ID")
-                                .takes_value(true)
-                                .required(true),
-                        )
-                        .arg(
-                            Arg::with_name("path")
-                                .help("The directory to examine. Defaults to /")
-                                .takes_value(true)
-                                .required(false),
-                        ),
-                )
-                .subcommand(
-                    SubCommand::with_name("info")
-                        .about("Display information about a file")
-                        .arg(
-                            Arg::with_name("course")
-                                .help("A course title or numeric ID")
-                                .takes_value(true)
-                                .required(true),
-                        )
-                        .arg(
-                            Arg::with_name("path")
-                                .help("The file or directory to examine")
-                                .takes_value(true)
-                                .required(true),
-                        ),
-                )
-                .subcommand(
-                    SubCommand::with_name("download")
-                        .about("Download a file")
-                        .arg(
-                            Arg::with_name("course")
-                                .help("A course title or numeric ID")
-                                .takes_value(true)
-                                .required(true),
-                        )
-                        .arg(
-                            Arg::with_name("path")
-                                .help("The file or directory to download")
-                                .takes_value(true)
-                                .required(true),
-                        ),
-                ),
-        )
-        .subcommand(
-            SubCommand::with_name("assignment")
-                .about("List, inspect, or submit assignments")
-                .subcommand(
-                    SubCommand::with_name("ls").about("List assignments").arg(
-                        Arg::with_name("course")
-                            .help("A course title or numeric ID")
-                            .takes_value(true)
-                            .required(true),
-                    ),
-                )
-                .subcommand(
-                    SubCommand::with_name("info")
-                        .about("Display information about an assignment")
-                        .arg(
-                            Arg::with_name("course")
-                                .help("A course title or numeric ID")
-                                .takes_value(true)
-                                .required(true),
-                        )
-                        .arg(
-                            Arg::with_name("id")
-                                .help("An assignment ID")
-                                .takes_value(true)
-                                .required(true),
-                        ),
-                )
-                .subcommand(
-                    SubCommand::with_name("submit")
-                        .about("Submit files for an assignment")
-                        .arg(
-                            Arg::with_name("course")
-                                .help("A course title or numeric ID")
-                                .takes_value(true)
-                                .required(true),
-                        )
-                        .arg(
-                            Arg::with_name("id")
-                                .help("An assignment ID")
-                                .takes_value(true)
-                                .required(true),
-                        )
-                        .arg(
-                            Arg::with_name("file")
-                                .help("The file to submit")
-                                .takes_value(true)
-                                .multiple(true)
-                                .required(true),
-                        ),
-                ),
-        )
-        .subcommand(SubCommand::with_name("config").about(
-            "Edit the user config",
-        ))
 }
 
 fn course_subcommand(matches: &clap::ArgMatches) -> Result<(), String> {
@@ -242,4 +112,62 @@ fn assignment_subcommand(matches: &clap::ArgMatches) -> Result<(), String> {
 
 fn config_subcommand(_matches: &clap::ArgMatches) -> Result<(), String> {
     unimplemented!()
+}
+
+fn app<'a, 'b>() -> clap::App<'a, 'b> {
+    clap_app!(canvas =>
+        (version: env!("CARGO_PKG_VERSION"))
+        (author: "C Jones <code@calebjones.net>")
+        (about: "An app for interacting with Canvas")
+        (setting: clap::AppSettings::ArgRequiredElseHelp)
+        (@subcommand course =>
+            (about: "List courses and view course information")
+            (@subcommand ls =>
+                (about: "List courses")
+            )
+            (@subcommand info =>
+                (about: "Display information about a course")
+                (@arg course: +required "A course title or numeric ID")
+            )
+        )
+        (@subcommand file =>
+            (about: "List, inspect, or download files")
+            (@subcommand ls =>
+                (about: "List files")
+                (@arg course: +required "A course title or numeric ID")
+                (@arg path: "The directory to examine. Defaults to /")
+            )
+            (@subcommand info =>
+                (about: "Display information about a file")
+                (@arg course: +required "A course title or numeric ID")
+                (@arg path: +required "The file or directory to examine")
+            )
+            (@subcommand download =>
+                (about: "Download a file")
+                (@arg course: +required "A course title or numeric ID")
+                (@arg path: +required "The file or directory to download")
+            )
+        )
+        (@subcommand assignment =>
+            (about: "List, inspect, or submit assignments")
+            (@subcommand ls =>
+                (about: "List assignments")
+                (@arg course: +required "A course title or numeric ID")
+            )
+            (@subcommand info =>
+                (about: "Display information about an assignment")
+                (@arg course: +required "A course title or numeric ID")
+                (@arg id: +required "An assignment ID")
+            )
+            (@subcommand submit =>
+                (about: "Submit files for an assignment")
+                (@arg course: +required "A course title or numeric ID")
+                (@arg id: +required "An assignment ID")
+                (@arg file: +required +multiple "The file to submit")
+            )
+        )
+        (@subcommand config =>
+            (about: "Edit the user config")
+        )
+    )
 }
