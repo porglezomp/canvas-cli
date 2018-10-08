@@ -6,9 +6,11 @@ In order to run it, you'll need to go into your canvas settings and generate an 
 At `~/.config/canvas-cli/config.toml`, make a config file containing:
 
 ```toml
+
 [api]
-url = "umich.instructure.com"  # whichever canvas domain that you use
-key = "asdfasdfasdf"  # an API key that you generate in your settings
+url = " umich.instructure.com "   # whichever canvas domain that you use
+key = " asdfasdfasdf "              # an API key that you generate in your settings
+
 ```
 
 You can find documentation by running `canvas --help`
