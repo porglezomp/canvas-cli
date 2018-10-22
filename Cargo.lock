@@ -1,16 +1,3 @@
-[root]
-name = "canvas"
-version = "0.1.0"
-dependencies = [
- "chrono 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "clap 2.26.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "hyper 0.11.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "reqwest 0.7.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "serde 1.0.14 (registry+https://github.com/rust-lang/crates.io-index)",
- "serde_derive 1.0.14 (registry+https://github.com/rust-lang/crates.io-index)",
- "toml 0.4.5 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
 [[package]]
 name = "adler32"
 version = "1.0.2"
@@ -71,6 +58,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "byteorder 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "iovec 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "canvas"
+version = "0.1.0"
+dependencies = [
+ "chrono 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "clap 2.26.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "hyper 0.11.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "reqwest 0.7.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde 1.0.14 (registry+https://github.com/rust-lang/crates.io-index)",
+ "serde_derive 1.0.14 (registry+https://github.com/rust-lang/crates.io-index)",
+ "toml 0.4.5 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]

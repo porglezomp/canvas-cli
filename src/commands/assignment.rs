@@ -1,7 +1,7 @@
-mod clap;
+use clap;
 
-mod canvas;
-mod config;
+use super::super::canvas;
+use config;
 
 
 pub fn subcommand(matches: &clap::ArgMatches) -> Result<(), String> {
