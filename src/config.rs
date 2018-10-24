@@ -35,7 +35,9 @@ pub fn config_path() -> Result<std::path::PathBuf, String> {
 
 pub fn config_file() -> Result<std::fs::File, String> {
     let path = config_path()?;
-    std::fs::File::open(path).map_err(|err| format!("Cannot open config file ({})", err))
+    std::fs::File::open(path)
+        .map_err(|err| format!("Config file doesn't appear to exist, try running {} config",
+                                std::env::current_exe().unwrap().to_string_lossy()))
 }
 
 pub fn get_config() -> Result<Config, String> {
