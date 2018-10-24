@@ -127,6 +127,9 @@ pub fn subcommand(_matches: &clap::ArgMatches) -> Result<(), String> {
     // We have to allow this to fail in case it doesn't already exist
     let _ = std::fs::rename(&path, &backup_path);
 
+    std::fs::create_dir_all(&path.parent().unwrap())
+        .map_err(|err| format!("Error creating config dir ({})", err))?;
+
     let mut file = std::fs::OpenOptions::new()
         .write(true)
         .create(true)
