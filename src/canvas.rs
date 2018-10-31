@@ -93,8 +93,7 @@ pub fn find_course_id(config: &Config, client: &Client, course_id: &str) -> Resu
 pub fn get_url_json<T: DeserializeOwned>(config: &Config, client: &Client, url: &str) -> Result<T> {
     let mut response = client
         .get(url)
-        .map_err(|err| format!("Failed to make GET request ({})", err))?
-        .header(config.auth())
+        .bearer_auth(config.key())
         .send()
         .map_err(|err| format!("Failed to request ({})", err))?;
     if response.status().is_success() {
