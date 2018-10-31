@@ -7,7 +7,7 @@ authors = ["Caleb Jones <code@calebjones.net>"]
 toml = "0.4"
 serde = "1.0"
 serde_derive = "1.0"
-reqwest = "0.7.3"
-hyper = "0.11.2"
+reqwest = "0.9.4"
 chrono = { version = "0.4", features = ["serde"] }
-clap = "2.26"
+clap = "2.32"
+xdg = "^2.1"

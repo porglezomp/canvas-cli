@@ -3,12 +3,10 @@ extern crate serde_derive;
 extern crate serde;
 extern crate toml;
 extern crate reqwest;
-extern crate hyper;
 extern crate chrono;
 #[macro_use]
 extern crate clap;
-
-use std::io::{Read, Write};
+extern crate xdg;
 
 mod config;
 mod canvas;

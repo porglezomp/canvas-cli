@@ -2,11 +2,11 @@ use clap;
 
 use canvas;
 use config;
-
+use reqwest;
 
 pub fn subcommand(matches: &clap::ArgMatches) -> Result<(), String> {
     let config = config::get_config()?;
-    let client = config::get_client()?;
+    let client = reqwest::Client::new();
     match matches.subcommand() {
         ("ls", Some(_ls_matches)) => {
             let courses = canvas::get_course_list(&config, &client)?;
