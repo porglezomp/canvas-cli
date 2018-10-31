@@ -34,16 +34,18 @@ pub fn config_path() -> Result<std::path::PathBuf, String> {
 
 pub fn config_file() -> Result<std::fs::File, String> {
     let path = config_path()?;
-    std::fs::File::open(path)
-        .map_err(|_err| format!("Config file doesn't appear to exist, try running {} config",
-                                std::env::current_exe().unwrap().to_string_lossy()))
+    std::fs::File::open(path).map_err(|_err| {
+        format!(
+            "Config file doesn't appear to exist, try running {} config.",
+            std::env::args().next().unwrap_or_else(|| "canvas".into())
+        )
+    })
 }
 
 pub fn get_config() -> Result<Config, String> {
     let mut file = config_file()?;
     let mut data = Vec::new();
-    file.read_to_end(&mut data).map_err(|err| {
-        format!("Cannot read config file ({})", err)
-    })?;
+    file.read_to_end(&mut data)
+        .map_err(|err| format!("Cannot read config file ({})", err))?;
     toml::from_slice(&data).map_err(|err| format!("Cannot parse config ({})", err))
 }
